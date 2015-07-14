@@ -24,6 +24,7 @@
 *.c128
 *.c64
 *.cc2538dk
+*.avr-atmega2560
 *.report
 summary
 *.summary
