@@ -54,6 +54,7 @@ ifdef COFFEE_FILES                #if files are defined force definition of COFF
  COFFEE_ADDRESS1 = $(shell echo $$(( $(COFFEE_ADDRESS) + 1 )))
  CONTIKI_TARGET_SOURCEFILES += cfs-coffee.c cfs-coffee-arch.c 
  CFLAGS += -DCOFFEE_FILES=$(COFFEE_FILES) -DCOFFEE_ADDRESS=$(COFFEE_ADDRESS)
+ CXXFLAGS += -DCOFFEE_FILES=$(COFFEE_FILES) -DCOFFEE_ADDRESS=$(COFFEE_ADDRESS)
  ifneq ($(COFFEE_ADDRESS), DEFAULT)
   LDFLAGS+= -Wl,--section-start=.coffeefiles=$(COFFEE_ADDRESS)
  endif
@@ -88,6 +89,7 @@ CONTIKI_SOURCEFILES        += $(CONTIKI_TARGET_SOURCEFILES)
 
 ### Compiler definitions
 CC       = avr-gcc
+CXX      = avr-g++
 LD       = avr-gcc
 AS       = avr-as
 AR       = avr-ar
@@ -99,6 +101,7 @@ CFLAGSNO = -Wall -mmcu=$(MCU) -gdwarf-2 -fno-strict-aliasing \
             -I. -I$(CONTIKI)/core -I$(CONTIKI_CPU) $(USB_INCLUDES) \
             $(CONTIKI_PLAT_DEFS)
 CFLAGS   += $(CFLAGSNO) -O$(OPTI)
+CXXFLAGS += $(CFLAGSNO) -O$(OPTI)
 ASFLAGS  += -mmcu=$(MCU)
 ifndef BOOTLOADER_START
   BOOTLOADER_START = 0x1F800
@@ -113,6 +116,8 @@ SMALL ?= 1
 ifeq ($(SMALL),1)
 CFLAGS += -ffunction-sections
 CFLAGS += -fdata-sections
+CXXFLAGS += -ffunction-sections
+CXXFLAGS += -fdata-sections
 LDFLAGS += -Wl,--gc-sections
 endif # SMALL
 
@@ -126,8 +131,14 @@ CONTIKI_TARGET_DIRS_CONCAT = ${addprefix $(CONTIKI)/platform/$(TARGET)/, \
 $(OBJECTDIR)/%.o: %.c | $(OBJECTDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(OBJECTDIR)/%.o: %.cpp | $(OBJECTDIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 %.ko: %.o
 	$(STRIP) -K _init -K _fini --strip-unneeded -g -x $< -o $@
@@ -169,6 +180,10 @@ endif
 	$(CC) $(CFLAGS) -c $< -o $@
 	$(STRIP) --strip-unneeded -g -x $@
 
+%-stripped.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(STRIP) --strip-unneeded -g -x $@
+
 #%.ce: %.c
 #	$(CC) $(CFLAGS) -c $< -o $@
 #	$(STRIP) --strip-unneeded -g -x $@
@@ -181,6 +196,11 @@ endif
 	cp $(CONTIKI)/tools/empty-symbols.c symbols.c
 	cp $(CONTIKI)/tools/empty-symbols.h symbols.h
 	$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
+
+%.co: %.cpp
+	cp $(CONTIKI)/tools/empty-symbols.c symbols.c
+	cp $(CONTIKI)/tools/empty-symbols.h symbols.h
+	$(CXX) $(CXXFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
 
 %-stripped.o: %.o
 	$(STRIP) --strip-unneeded -g -x -o $@ $<
