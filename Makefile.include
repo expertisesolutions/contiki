@@ -53,6 +53,7 @@ LOWERCASE = -abcdefghijklmnopqrstuvwxyz
 UPPERCASE = _ABCDEFGHIJKLMNOPQRSTUVWXYZ
 TARGET_UPPERCASE := ${strip ${shell echo $(TARGET) | sed y!$(LOWERCASE)!$(UPPERCASE)!}}
 CFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
+CXXFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
 
 include $(CONTIKI)/core/net/rime/Makefile.rime
 include $(CONTIKI)/core/net/mac/Makefile.mac
@@ -80,7 +81,7 @@ CONTIKI_SOURCEFILES += $(CONTIKIFILES)
 CONTIKIDIRS += ${addprefix $(CONTIKI)/core/,dev lib net net/mac net/rime \
                  net/rpl sys cfs ctk lib/ctk loader . }
 
-oname = ${patsubst %.c,%.o,${patsubst %.S,%.o,$(1)}}
+oname = ${patsubst %.c,%.o,${patsubst %.S,%.o,${patsubst %.cpp,%.o,$(1)}}}
 
 CONTIKI_OBJECTFILES = ${addprefix $(OBJECTDIR)/,${call oname, $(CONTIKI_SOURCEFILES)}}
 
@@ -151,6 +152,7 @@ endif
 
 COMMA := ,
 CFLAGS += ${addprefix -D,${subst $(COMMA), ,$(DEFINES)}}
+CXXFLAGS += ${addprefix -D,${subst $(COMMA), ,$(DEFINES)}}
 
 ### Setup directory search path for source and header files
 
@@ -163,9 +165,11 @@ SOURCEDIRS = . $(PROJECTDIRS) $(CONTIKI_TARGET_DIRS_CONCAT) \
              $(CONTIKI_CPU_DIRS_CONCAT) $(CONTIKIDIRS) $(APPDS) ${dir $(target_makefile)}
 
 vpath %.c $(SOURCEDIRS)
+vpath %.cpp $(SOURCEDIRS)
 vpath %.S $(SOURCEDIRS)
 
 CFLAGS += ${addprefix -I,$(SOURCEDIRS)}
+CXXFLAGS += ${addprefix -I,$(SOURCEDIRS)}
 
 ### Check for a git repo and pass version if found
 ### git.exe in Windows cmd shells may require no stderr redirection
@@ -173,13 +177,15 @@ CFLAGS += ${addprefix -I,$(SOURCEDIRS)}
 RELSTR=${shell git describe --tags 2>/dev/null}
 ifneq ($(RELSTR),)
 CFLAGS += -DCONTIKI_VERSION_STRING=\"Contiki-$(RELSTR)\"
+CXXFLAGS += -DCONTIKI_VERSION_STRING=\"Contiki-$(RELSTR)\"
 endif
 
 ### Automatic dependency generation
 
 ifneq ($(MAKECMDGOALS),clean)
 -include ${addprefix $(OBJECTDIR)/,$(CONTIKI_SOURCEFILES:.c=.d) \
-                                   $(PROJECT_SOURCEFILES:.c=.d)}
+                                   $(PROJECT_SOURCEFILES:.c=.d) \
+	                           $(PROJECT_SOURCEFILES:.cpp=.d)}
 endif
 
 ### See http://make.paulandlesley.org/autodep.html#advanced
@@ -208,11 +214,23 @@ ifndef CUSTOM_RULE_C_TO_CE
 	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
 	$(STRIP) --strip-unneeded -g -x $@
 endif
+ifndef CUSTOM_RULE_CPP_TO_CE
+%.ce: %.cpp
+	$(TRACE_CC)
+	$(Q)$(CXX) $(CXXFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
+	$(STRIP) --strip-unneeded -g -x $@
+endif
 
 ifndef CUSTOM_RULE_C_TO_OBJECTDIR_O
 $(OBJECTDIR)/%.o: %.c | $(OBJECTDIR)
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -MMD -c $< -o $@
+	@$(FINALIZE_DEPENDENCY)
+endif
+ifndef CUSTOM_RULE_CPP_TO_OBJECTDIR_O
+$(OBJECTDIR)/%.o: %.cpp | $(OBJECTDIR)
+	$(TRACE_CC)
+	$(Q)$(CXX) $(CXXFLAGS) -MMD -c $< -o $@
 	@$(FINALIZE_DEPENDENCY)
 endif
 
@@ -227,12 +245,22 @@ ifndef CUSTOM_RULE_C_TO_O
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 endif
+ifndef CUSTOM_RULE_CPP_TO_O
+%.o: %.cpp
+	$(TRACE_CC)
+	$(Q)$(CXX) $(CXXFLAGS) -c $< -o $@
+endif
 
 
 ifndef CUSTOM_RULE_C_TO_CO
 %.co: %.c
 	$(TRACE_CC)
 	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
+endif
+ifndef CUSTOM_RULE_CPP_TO_CO
+%.co: %.cpp
+	$(TRACE_CC)
+	$(Q)$(CXX) $(CXXFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
 endif
 
 ifndef AROPTS
@@ -270,6 +298,8 @@ endif
 # a single C source into a binary to force GNU make to consider
 # the match-anything rule below instead.
 %: %.c
+
+%: %.cpp
 
 # Match-anything pattern rule to allow the project makefiles to
 # abstract from the actual binary name. It needs to contain some
