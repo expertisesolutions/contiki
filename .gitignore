@@ -25,6 +25,7 @@
 *.c64
 *.cc2538dk
 *.remote
+*.avr-atmega2560
 *.srf06-cc26xx
 *.ev-aducrf101mkxz
 *.report
